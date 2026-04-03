@@ -33,3 +33,10 @@ from .unitree_h1_2.h1_2_constants import (
 from .unitree_h1_2.h1_2_constants import (
   get_h1_2_robot_cfg as get_h1_2_robot_cfg,
 )
+
+from .engineai_pm01.pm01_constants import (
+  PM01_ACTION_SCALE as PM01_ACTION_SCALE,
+)
+from .engineai_pm01.pm01_constants import (
+  get_pm01_robot_cfg as get_pm01_robot_cfg,
+)
