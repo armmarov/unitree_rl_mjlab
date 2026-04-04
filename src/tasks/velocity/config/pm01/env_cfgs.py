@@ -7,8 +7,10 @@ from src.assets.robots import (
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs import mdp as envs_mdp
 from mjlab.envs.mdp.actions import JointPositionActionCfg
+from mjlab.envs.mdp.terminations import root_height_below_minimum
 from mjlab.managers.event_manager import EventTermCfg
 from mjlab.managers.reward_manager import RewardTermCfg
+from mjlab.managers.termination_manager import TerminationTermCfg
 from mjlab.sensor import ContactMatch, ContactSensorCfg, RayCastSensorCfg
 from mjlab.tasks.velocity import mdp
 from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
@@ -137,6 +139,12 @@ def engineai_pm01_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
   # PM01 gait period from rl_lab: 0.8s (vs default 0.6s).
   cfg.rewards["foot_gait"].params["period"] = 0.8
+
+  # Terminate if robot crouches too low (standing height is 0.92m).
+  cfg.terminations["base_height"] = TerminationTermCfg(
+    func=root_height_below_minimum,
+    params={"minimum_height": 0.55},
+  )
 
   # Apply play mode overrides.
   if play:
