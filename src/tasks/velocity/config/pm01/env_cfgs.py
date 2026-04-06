@@ -85,6 +85,10 @@ def engineai_pm01_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   cfg.events["foot_friction"].params["asset_cfg"].geom_names = geom_names
   cfg.events["base_com"].params["asset_cfg"].body_names = ("link_torso_yaw",)
 
+  # Observation history: 15 steps for actor (matches EngineAI), 3 for critic.
+  cfg.observations["actor"].history_length = 15
+  cfg.observations["critic"].history_length = 3
+
   # PM01 pose standard deviations.
   # Legs get the most freedom for natural stride.
   # Hip roll/yaw tighter to prevent lateral sway.
