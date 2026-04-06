@@ -6,10 +6,12 @@ from src.assets.robots import (
 )
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs import mdp as envs_mdp
+from mjlab.envs.mdp import dr
 from mjlab.envs.mdp.actions import JointPositionActionCfg
 from mjlab.envs.mdp.terminations import root_height_below_minimum
 from mjlab.managers.event_manager import EventTermCfg
 from mjlab.managers.reward_manager import RewardTermCfg
+from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.managers.termination_manager import TerminationTermCfg
 from mjlab.sensor import ContactMatch, ContactSensorCfg, RayCastSensorCfg
 from mjlab.tasks.velocity import mdp
@@ -24,6 +26,9 @@ def engineai_pm01_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   cfg.sim.mujoco.ccd_iterations = 500
   cfg.sim.contact_sensor_maxmatch = 500
   cfg.sim.nconmax = 48
+
+  # 100Hz control: dt=0.005 * decimation=2 = 0.01s per step.
+  cfg.decimation = 2
 
   cfg.scene.entities = {"robot": get_pm01_robot_cfg()}
 
@@ -88,6 +93,66 @@ def engineai_pm01_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   # Observation history: 15 steps for actor (matches EngineAI), 3 for critic.
   cfg.observations["actor"].history_length = 15
   cfg.observations["critic"].history_length = 3
+
+  # -------------------------------------------------------------------
+  # Domain randomization (matching EngineAI for sim-to-real transfer).
+  # -------------------------------------------------------------------
+
+  # PD gain randomization: stiffness/damping 0.8-1.2x (startup).
+  cfg.events["pd_gains"] = EventTermCfg(
+    mode="startup",
+    func=dr.pd_gains,
+    params={
+      "asset_cfg": SceneEntityCfg("robot"),
+      "kp_range": (0.8, 1.2),
+      "kd_range": (0.8, 1.2),
+      "operation": "scale",
+    },
+  )
+
+  # Joint armature randomization: 0.27-2.0x (startup).
+  cfg.events["joint_armature"] = EventTermCfg(
+    mode="startup",
+    func=dr.joint_armature,
+    params={
+      "asset_cfg": SceneEntityCfg("robot"),
+      "operation": "scale",
+      "ranges": (0.27, 2.0),
+    },
+  )
+
+  # Joint friction randomization (startup).
+  cfg.events["joint_friction"] = EventTermCfg(
+    mode="startup",
+    func=dr.joint_friction,
+    params={
+      "asset_cfg": SceneEntityCfg("robot"),
+      "operation": "abs",
+      "ranges": (0.01, 1.15),
+    },
+  )
+
+  # Base body mass randomization: ±4.0 kg (startup).
+  cfg.events["body_mass"] = EventTermCfg(
+    mode="startup",
+    func=dr.body_mass,
+    params={
+      "asset_cfg": SceneEntityCfg("robot", body_names=("link_base",)),
+      "operation": "add",
+      "ranges": (-4.0, 4.0),
+    },
+  )
+
+  # Effort limit randomization: 0.8-1.2x (startup).
+  cfg.events["effort_limits"] = EventTermCfg(
+    mode="startup",
+    func=dr.effort_limits,
+    params={
+      "asset_cfg": SceneEntityCfg("robot"),
+      "effort_limit_range": (0.8, 1.2),
+      "operation": "scale",
+    },
+  )
 
   # PM01 pose standard deviations.
   # Legs get the most freedom for natural stride.
