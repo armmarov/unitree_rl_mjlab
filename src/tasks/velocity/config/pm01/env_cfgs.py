@@ -209,6 +209,9 @@ def engineai_pm01_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   # PM01 gait period from rl_lab: 0.8s (vs default 0.6s).
   cfg.rewards["foot_gait"].params["period"] = 0.8
 
+  # Increase soft landing penalty to match EngineAI (-0.02 vs default -1e-3).
+  cfg.rewards["soft_landing"].weight = -0.02
+
   # Terminate if robot crouches too low (standing height is 0.92m).
   cfg.terminations["base_height"] = TerminationTermCfg(
     func=root_height_below_minimum,
