@@ -62,44 +62,95 @@ Available velocity tracking tasks:
   - Unitree-H1_2-Flat
   - Unitree-A2-Flat
   - Unitree-R1-Flat
+  - EngineAI-PM01-Flat
 
 > [!NOTE]
 > For more details, refer to the mjlab documentation:
 > [mjlab documentation](https://mujocolab.github.io/mjlab/index.html).
 
-### 2. Motion Imitation Training
+### 2. Motion Imitation Training (BeyondMimic)
 
-Train a Unitree G1 to mimic reference motion sequences.
+Train robots to mimic reference motion sequences using direct motion imitation.
 
 <div style="margin-left: 20px;">
 
-#### 2.1 Prepare Motion Files
+#### 2.1 Motion Retargeting (Human MoCap to Robot)
 
-Prepare csv motion files in mjlab/motions/g1/ and convert them to npz format:
+Use [GMR (General Motion Retargeting)](https://github.com/YanjieZe/GMR) to convert human motion data to robot joint angles.
 
+**Prerequisites:**
+- Clone GMR and install dependencies
+- Download [SMPL-X body models](https://smpl-x.is.tue.mpg.de/) to `GMR/assets/body_models/smplx/`
+- Download motion data from [AMASS](https://amass.is.tue.mpg.de/) (SMPL-X G format)
+
+**Retarget to robot:**
+
+```bash
+cd /path/to/GMR
+
+# Retarget AMASS motion to PM01
+python scripts/smplx_to_robot.py \
+  --robot engineai_pm01 \
+  --smplx_file assets/motions/amass/ACCAD/some_motion.npz \
+  --save_path output/pm01_motion.pkl
+
+# Convert pkl to CSV
+python scripts/batch_gmr_pkl_to_csv.py --folder output/
+```
+
+Supported robots: `unitree_g1`, `engineai_pm01`, and others. See GMR README for full list.
+
+#### 2.2 Prepare Motion Files
+
+Convert CSV motion files to NPZ format for training:
+
+**Unitree G1:**
 ```bash
 python scripts/csv_to_npz.py \
---input-file src/assets/motions/g1/dance1_subject2.csv \
---output-name dance1_subject2.npz \
---input-fps 30 \
---output-fps 50
+  --robot g1 \
+  --input-file src/assets/motions/g1/dance1_subject2.csv \
+  --output-name dance1_subject2.npz \
+  --input-fps 30 \
+  --output-fps 50
 ```
 
-**npz files will be stored at:**：`src/motions/g1/...`
+**EngineAI PM01:**
+```bash
+python scripts/csv_to_npz.py \
+  --robot pm01 \
+  --input-file /path/to/GMR/output/csv/pm01_motion.csv \
+  --output-name pm01_motion.npz \
+  --input-fps 30 \
+  --output-fps 100
+```
 
-#### 2.2 Training
+NPZ files are saved to `src/assets/motions/<robot>/`.
 
-After generating the NPZ file, launch imitation training:
+#### 2.3 Training
 
 ```bash
-python scripts/train.py Unitree-G1-Tracking-No-State-Estimation --motion_file=src/assets/motions/g1/dance1_subject2.npz --env.scene.num-envs=4096
+# Unitree G1
+python scripts/train.py Unitree-G1-Tracking \
+  --motion-file src/assets/motions/g1/dance1_subject2.npz \
+  --env.scene.num-envs 4096
+
+# EngineAI PM01
+python scripts/train.py EngineAI-PM01-Tracking \
+  --motion-file src/assets/motions/pm01/pm01_motion.npz \
+  --env.scene.num-envs 4096
 ```
+
+Available motion imitation tasks:
+  - Unitree-G1-Tracking
+  - Unitree-G1-Tracking-No-State-Estimation
+  - EngineAI-PM01-Tracking
 
 </div>
 
 > [!NOTE]
 > For detailed motion imitation instructions, refer to the BeyondMimic documentation:
 > [BeyondMimic documentation](https://github.com/HybridRobotics/whole_body_tracking/blob/main/README.md#motion-preprocessing--registry-setup).
+> For motion retargeting details, see [GMR documentation](https://github.com/YanjieZe/GMR).
 
 #### ⚙️  Parameter Description
 - `--env.scene`: simulation scene configuration (e.g., num_envs, dt, ground type, gravity, disturbances)
@@ -121,11 +172,13 @@ To visualize policy behavior in MuJoCo:
 Velocity tracking:
 ```bash
 python scripts/play.py Unitree-G1-Flat --checkpoint_file=logs/rsl_rl/g1_velocity/2026-xx-xx_xx-xx-xx/model_xx.pt
+python scripts/play.py EngineAI-PM01-Flat --checkpoint_file=logs/rsl_rl/pm01_velocity/2026-xx-xx_xx-xx-xx/model_xx.pt
 ```
 
 Motion imitation:
 ```bash
 python scripts/play.py Unitree-G1-Tracking --motion_file=src/assets/motions/g1/dance1_subject2.npz --checkpoint_file=logs/rsl_rl/g1_tracking/2026-xx-xx_xx-xx-xx/model_xx.pt
+python scripts/play.py EngineAI-PM01-Tracking --motion_file=src/assets/motions/pm01/pm01_motion.npz --checkpoint_file=logs/rsl_rl/pm01_tracking/2026-xx-xx_xx-xx-xx/model_xx.pt
 ```
 
 **Note**：
