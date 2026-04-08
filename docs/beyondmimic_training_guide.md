@@ -86,6 +86,7 @@ GMR/assets/body_models/smplx/
 | Dataset | Where | Best for | Format |
 |---|---|---|---|
 | **AMASS** | https://amass.is.tue.mpg.de/ | Largest variety — walking, dance, sports, martial arts | SMPL-X .npz |
+| **KungfuBot (PBHC)** | https://github.com/TeleHuman/PBHC | Kicks, punches, martial arts, dance | SMPL .pkl |
 | **LAFAN1** | https://github.com/ubisoft/ubisoft-laforge-animation-dataset | Locomotion, acrobatics | .bvh |
 
 **AMASS sub-datasets by motion type:**
@@ -97,6 +98,17 @@ GMR/assets/body_models/smplx/
 | BMLrub | Walking, running, everyday actions |
 | HDM05 | Dance, gymnastics |
 | KIT | Manipulation, interaction |
+
+**KungfuBot example motions (pre-included):**
+
+| Motion | Frames | Description |
+|---|---|---|
+| Hooks_punch | 175 | Hook punches |
+| Roundhouse_kick | 158 | Spinning roundhouse kick |
+| Side_kick | ~180 | Double side kick |
+| Bruce_Lee_pose | ? | Wushu stance |
+| Charleston_dance | ? | Dance |
+| Horse-stance_punch | ? | Horse stance + punch combo |
 
 Download the **SMPL-X G** (gender neutral) version from AMASS.
 
@@ -129,6 +141,32 @@ python scripts/smplx_to_robot.py \
   --robot engineai_pm01 \
   --smplx_file assets/motions/amass/ACCAD/Male2MartialArtsPunches_c3d/E3_-__cross_left_stageii.npz \
   --save_path output/pm01_punch.pkl
+
+# 2. Convert pkl to CSV
+python scripts/batch_gmr_pkl_to_csv.py --folder output/
+
+# 3. Fix orientation (face forward) and height
+cd /path/to/unitree_rl_mjlab
+```
+
+#### Using KungfuBot (PBHC) Dataset
+
+KungfuBot motions are in SMPL pkl format and need to be converted to SMPL-X npz first:
+
+```bash
+# 0. Convert KungfuBot pkl to SMPL-X npz
+cd /path/to/unitree_rl_mjlab
+mkdir -p /path/to/GMR/assets/motions/kungfubot
+python scripts/kungfubot_to_smplx.py \
+  /path/to/dataset/PBHC/example/motion_data/Roundhouse_kick.pkl \
+  --output-npz /path/to/GMR/assets/motions/kungfubot/Roundhouse_kick_smplx.npz
+
+# 1. Retarget to PM01 via GMR
+cd /path/to/GMR
+python scripts/smplx_to_robot.py \
+  --robot engineai_pm01 \
+  --smplx_file assets/motions/kungfubot/Roundhouse_kick_smplx.npz \
+  --save_path output/pm01_roundhouse_kick.pkl
 
 # 2. Convert pkl to CSV
 python scripts/batch_gmr_pkl_to_csv.py --folder output/
