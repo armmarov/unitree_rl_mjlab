@@ -181,6 +181,37 @@ python scripts/play.py Unitree-G1-Tracking --motion_file=src/assets/motions/g1/d
 python scripts/play.py EngineAI-PM01-Tracking --motion_file=src/assets/motions/pm01/pm01_motion.npz --checkpoint_file=logs/rsl_rl/pm01_tracking/2026-xx-xx_xx-xx-xx/model_xx.pt
 ```
 
+### 4. Export Release
+
+Package trained models (ONNX, MNN, checkpoint, configs) into a release folder:
+
+```bash
+# Velocity task
+python scripts/export_release.py pm01_velocity 2026-04-06_20-08-21
+
+# Tracking task
+python scripts/export_release.py pm01_tracking 2026-04-07_20-02-39
+
+# G1 tracking
+python scripts/export_release.py g1_tracking 2026-xx-xx_xx-xx-xx
+```
+
+Output structure:
+```
+release/<task>/<run_name>/
+├── policy.onnx        # For deployment
+├── policy.mnn         # MNN format (auto-converted)
+├── model_XXXXX.pt     # Latest checkpoint
+└── params/
+    ├── env.yaml       # Training environment config
+    └── agent.yaml     # RL algorithm config
+```
+
+Options:
+- `--no-mnn` — skip MNN conversion
+- `--no-checkpoint` — skip .pt file
+- `--release-dir custom_dir` — change output folder
+
 **Note**：
 
 - During training, policy.onnx and policy.onnx.data are also exported for deployment onto physical robots.
@@ -191,7 +222,7 @@ python scripts/play.py EngineAI-PM01-Tracking --motion_file=src/assets/motions/p
 |----------------------------------|--------------------------------|------------------------------------|-----------------------------------|
 | ![go2](doc/gif/go2-velocity.gif) | ![g1](doc/gif/g1-velocity.gif) | ![h1_2](doc/gif/h1_2-velocity.gif) | ![g1_mimic](doc/gif/g1-mimic.gif) |
 
-### 4. Real Deployment
+### 5. Real Deployment
 
 Before deployment, install the required communication tools:
 - [cyclonedds](https://github.com/eclipse-cyclonedds/cyclonedds.git)

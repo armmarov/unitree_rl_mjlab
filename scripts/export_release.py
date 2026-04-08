@@ -7,16 +7,19 @@ import sys
 from pathlib import Path
 
 
-def find_run_dir(run_name: str) -> Path:
-  """Find the run directory by exact name."""
-  logs_root = Path("logs/rsl_rl/pm01_velocity")
+def find_run_dir(task: str, run_name: str) -> Path:
+  """Find the run directory by task and exact name."""
+  logs_root = Path("logs/rsl_rl") / task
   run_dir = logs_root / run_name
   if not run_dir.exists():
-    available = sorted(d.name for d in logs_root.iterdir() if d.is_dir())
-    print(f"Error: Run '{run_name}' not found in {logs_root}")
-    print(f"Available runs:")
-    for name in available:
-      print(f"  {name}")
+    if logs_root.exists():
+      available = sorted(d.name for d in logs_root.iterdir() if d.is_dir())
+      print(f"Error: Run '{run_name}' not found in {logs_root}")
+      print(f"Available runs:")
+      for name in available:
+        print(f"  {name}")
+    else:
+      print(f"Error: No logs found for task '{task}' at {logs_root}")
     sys.exit(1)
   return run_dir
 
@@ -58,17 +61,18 @@ def convert_to_mnn(onnx_path: Path, mnn_path: Path) -> bool:
 
 
 def main():
-  parser = argparse.ArgumentParser(description="Export PM01 trained model to release folder")
+  parser = argparse.ArgumentParser(description="Export trained model to release folder")
+  parser.add_argument("task", help="Task name, e.g. 'pm01_velocity', 'pm01_tracking', 'g1_tracking'")
   parser.add_argument("run_name", help="Run folder name, e.g. '2026-04-06_20-08-21'")
   parser.add_argument("--release-dir", default="release", help="Output directory (default: release)")
   parser.add_argument("--no-mnn", action="store_true", help="Skip MNN conversion")
   parser.add_argument("--no-checkpoint", action="store_true", help="Skip copying .pt checkpoint")
   args = parser.parse_args()
 
-  run_dir = find_run_dir(args.run_name)
+  run_dir = find_run_dir(args.task, args.run_name)
   print(f"Run directory: {run_dir}")
 
-  release_dir = Path(args.release_dir) / run_dir.name
+  release_dir = Path(args.release_dir) / args.task / run_dir.name
   release_dir.mkdir(parents=True, exist_ok=True)
   print(f"Release directory: {release_dir}")
 
