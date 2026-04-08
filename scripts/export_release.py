@@ -108,6 +108,13 @@ def main():
       shutil.copy2(f, release_params / f.name)
       print(f"  Copied: params/{f.name}")
 
+  # Copy bundled ONNX for tracking tasks (policy + motion data).
+  if "tracking" in args.task:
+    bundled = list(run_dir.glob("20*.onnx"))
+    for f in bundled:
+      shutil.copy2(f, release_dir / "policy_bundled.onnx")
+      print(f"  Copied: {f.name} → policy_bundled.onnx (policy + motion for deployment)")
+
   # Copy motion NPZ for tracking tasks.
   if "tracking" in args.task:
     robot = "pm01" if "pm01" in args.task else "g1"
