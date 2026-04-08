@@ -120,6 +120,61 @@ GMR/assets/motions/amass/ACCAD/
 
 ## 4. Commands
 
+### Full Pipeline Example (PM01 Punch)
+
+```bash
+# 1. Retarget human motion to PM01
+cd /path/to/GMR
+python scripts/smplx_to_robot.py \
+  --robot engineai_pm01 \
+  --smplx_file assets/motions/amass/ACCAD/Male2MartialArtsPunches_c3d/E3_-__cross_left_stageii.npz \
+  --save_path output/pm01_punch.pkl
+
+# 2. Convert pkl to CSV
+python scripts/batch_gmr_pkl_to_csv.py --folder output/
+
+# 3. Fix orientation (face forward) and height
+cd /path/to/unitree_rl_mjlab
+python scripts/fix_motion_orientation.py \
+  /path/to/GMR/output/csv/pm01_punch.csv \
+  --output-csv /path/to/GMR/output/csv/pm01_punch_fixed.csv \
+  --height-offset 0.25
+
+# 4. Prepend standing-to-motion transition
+python scripts/prepend_standing.py \
+  /path/to/GMR/output/csv/pm01_punch_fixed.csv \
+  --output-csv /path/to/GMR/output/csv/pm01_punch_final.csv
+
+# 5. Convert to NPZ
+python scripts/csv_to_npz.py \
+  --robot pm01 \
+  --input-file /path/to/GMR/output/csv/pm01_punch_final.csv \
+  --output-name pm01_punch.npz \
+  --input-fps 30 --output-fps 100
+
+# 6. Visualize (check motion looks correct before training)
+python scripts/play.py EngineAI-PM01-Tracking \
+  --motion-file src/assets/motions/pm01/pm01_punch.npz \
+  --agent zero --no-terminations True
+
+# 7. Train
+python scripts/train.py EngineAI-PM01-Tracking \
+  --motion-file src/assets/motions/pm01/pm01_punch.npz \
+  --env.scene.num-envs 4096
+
+# 8. Play trained policy
+python scripts/play.py EngineAI-PM01-Tracking \
+  --motion-file src/assets/motions/pm01/pm01_punch.npz \
+  --checkpoint-file logs/rsl_rl/pm01_tracking/<run>/model_XXXXX.pt
+
+# 9. Export release
+python scripts/export_release.py pm01_tracking <run_name>
+```
+
+---
+
+### Detailed Steps
+
 ### Step 1: Retarget (GMR)
 
 ```bash
@@ -151,7 +206,43 @@ python scripts/batch_gmr_pkl_to_csv.py --folder output/
 
 Output: `output/csv/pm01_punch.csv`
 
-### Step 3: CSV → NPZ
+### Step 3: Fix Orientation and Height
+
+GMR retargeting may produce motions where the robot faces the wrong direction or the root height doesn't match the robot's standing height. Use `fix_motion_orientation.py` to correct this.
+
+```bash
+cd /path/to/unitree_rl_mjlab
+python scripts/fix_motion_orientation.py \
+  /path/to/GMR/output/csv/pm01_punch.csv \
+  --output-csv /path/to/GMR/output/csv/pm01_punch_fixed.csv \
+  --target-yaw 0 \
+  --height-offset 0.25
+```
+
+Options:
+- `--target-yaw` — target facing direction in degrees (default: 0 = forward)
+- `--height-offset` — add to root Z height in meters (PM01 standing is 0.92m, GMR may output ~0.67m, so use ~0.25)
+
+### Step 4: Prepend Standing Transition
+
+The robot needs a smooth transition from its standing pose to the first frame of the motion. Without this, the robot would jerk into the motion pose instantly.
+
+```bash
+python scripts/prepend_standing.py \
+  /path/to/GMR/output/csv/pm01_punch_fixed.csv \
+  --output-csv /path/to/GMR/output/csv/pm01_punch_final.csv \
+  --hold-seconds 0.5 \
+  --transition-seconds 1.5
+```
+
+Options:
+- `--hold-seconds` — how long to hold the standing pose before transitioning (default: 0.5s)
+- `--transition-seconds` — duration of smooth interpolation to first motion frame (default: 1.5s)
+- `--fps` — frame rate of the CSV (default: 30)
+
+The script automatically detects and skips bad initial frames from GMR (large position jumps).
+
+### Step 5: CSV → NPZ
 
 ```bash
 cd /path/to/unitree_rl_mjlab
