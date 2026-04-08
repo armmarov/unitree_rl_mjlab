@@ -108,6 +108,15 @@ def main():
       shutil.copy2(f, release_params / f.name)
       print(f"  Copied: params/{f.name}")
 
+  # Copy motion NPZ for tracking tasks.
+  if "tracking" in args.task:
+    robot = "pm01" if "pm01" in args.task else "g1"
+    motions_dir = Path(f"src/assets/motions/{robot}")
+    if motions_dir.exists():
+      for npz_file in motions_dir.glob("*.npz"):
+        shutil.copy2(npz_file, release_dir / npz_file.name)
+        print(f"  Copied: {npz_file.name} (motion data)")
+
   print(f"\nRelease exported to: {release_dir}")
 
 
