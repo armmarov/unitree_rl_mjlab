@@ -114,6 +114,12 @@ def main():
     for f in bundled:
       shutil.copy2(f, release_dir / "policy_bundled.onnx")
       print(f"  Copied: {f.name} → policy_bundled.onnx (policy + motion for deployment)")
+      if not args.no_mnn:
+        bundled_mnn = release_dir / "policy_bundled.mnn"
+        if convert_to_mnn(release_dir / "policy_bundled.onnx", bundled_mnn):
+          print(f"  Created: policy_bundled.mnn")
+        else:
+          print(f"  Warning: Bundled MNN conversion failed")
 
   # Copy motion NPZ for tracking tasks.
   if "tracking" in args.task:
