@@ -15,12 +15,16 @@ HOLD_SECS   ?= 0.5
 TRANS_SECS  ?= 1.5
 START_FRAME ?=
 AUTO_BEST   ?=
+ALIGN_YAW   ?=
 PREPEND_FLAGS := --hold-seconds $(HOLD_SECS) --transition-seconds $(TRANS_SECS) --fps $(INPUT_FPS)
 ifneq ($(strip $(START_FRAME)),)
 PREPEND_FLAGS += --start-frame $(START_FRAME)
 endif
 ifneq ($(strip $(AUTO_BEST)),)
 PREPEND_FLAGS += --auto-best-entry
+endif
+ifneq ($(strip $(ALIGN_YAW)),)
+PREPEND_FLAGS += --align-yaw
 endif
 TASK        ?= EngineAI-PM01-Tracking
 EXPORT_TASK ?= pm01_tracking

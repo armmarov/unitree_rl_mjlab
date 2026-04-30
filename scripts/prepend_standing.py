@@ -64,6 +64,8 @@ def main():
                       help="Auto-pick motion frame closest to standing pose as entry.")
   parser.add_argument("--search-window", type=int, default=60,
                       help="Window of frames to search for best entry (default: 60).")
+  parser.add_argument("--align-yaw", action="store_true",
+                      help="Align motion start yaw to 0 to avoid body twist during transition.")
   args = parser.parse_args()
 
   # Load original motion.
@@ -100,6 +102,23 @@ def main():
   if entry > 0:
     motion = motion[entry:]
     print(f"Skipped {entry} frames; using {motion.shape[0]} frames")
+
+  # Optionally rotate all motion frames so the entry frame faces yaw=0.
+  if args.align_yaw:
+    entry_quat_xyzw = motion[0, 3:7]
+    entry_yaw = R.from_quat(entry_quat_xyzw).as_euler("xyz", degrees=True)[2]
+    yaw_correction = -entry_yaw
+    print(f"Aligning yaw: rotating motion by {yaw_correction:.1f} deg (entry yaw was {entry_yaw:.1f} deg)")
+    r_correction = R.from_euler("z", yaw_correction, degrees=True)
+    base_xy = motion[0, :2].copy()
+    for i in range(motion.shape[0]):
+      pos = motion[i, :3]
+      pos_centered = np.array([pos[0] - base_xy[0], pos[1] - base_xy[1], 0.0])
+      pos_rotated = r_correction.apply(pos_centered)
+      motion[i, 0] = pos_rotated[0] + base_xy[0]
+      motion[i, 1] = pos_rotated[1] + base_xy[1]
+      r_frame = R.from_quat(motion[i, 3:7])
+      motion[i, 3:7] = (r_correction * r_frame).as_quat()
 
   # Build home frame matching CSV format.
   home_frame = np.zeros(motion.shape[1])
