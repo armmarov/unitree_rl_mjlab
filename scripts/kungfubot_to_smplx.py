@@ -26,9 +26,9 @@ def main():
   print(f"Motion: {key.split('/')[-1]}")
   print(f"Frames: {num_frames}, FPS: {fps}, Duration: {num_frames/fps:.1f}s")
 
-  # Convert root quaternion (wxyz or xyzw?) to axis-angle.
-  # KungfuBot uses (w, x, y, z) format based on PHC convention.
-  root_rot_scipy = R.from_quat(root_rot[:, [1, 2, 3, 0]])  # wxyz -> xyzw for scipy
+  # Convert root quaternion to axis-angle.
+  # KungfuBot uses (x, y, z, w) format — same as scipy convention.
+  root_rot_scipy = R.from_quat(root_rot)  # already xyzw
   root_orient = root_rot_scipy.as_rotvec().astype(np.float32)  # (T, 3)
 
   # Build SMPL-X compatible format.
