@@ -1,0 +1,118 @@
+NAME        ?=
+ROBOT       ?= pm01
+MOTIONS_DIR := src/assets/motions/$(ROBOT)
+CSV         := $(MOTIONS_DIR)/$(NAME).csv
+NPZ         := $(MOTIONS_DIR)/$(NAME).npz
+FIXED_CSV   := $(MOTIONS_DIR)/$(NAME)_fixed.csv
+FINAL_CSV   := $(MOTIONS_DIR)/$(NAME)_final.csv
+FINAL_NPZ   := $(MOTIONS_DIR)/$(NAME)_final.npz
+
+INPUT_FPS   ?= 30
+OUTPUT_FPS  ?= 100
+HEIGHT_OFFSET ?= 0.25
+NUM_ENVS    ?= 4096
+TASK        ?= EngineAI-PM01-Tracking
+EXPORT_TASK ?= pm01_tracking
+RUN_NAME    ?=
+PY          ?= python
+
+# Default motion file for train/play (use _final if exists, else NAME.npz).
+MOTION_FILE ?= $(if $(wildcard $(FINAL_NPZ)),$(FINAL_NPZ),$(NPZ))
+
+.PHONY: help fix-orientation prepend csv-to-npz prep visualize \
+        train play export check-name check-csv check-run
+
+help:
+	@echo "Targets (specify NAME=<motion_basename>):"
+	@echo ""
+	@echo "  make prep         NAME=Jog_3_stageii"
+	@echo "      Fix orientation + height, prepend standing, then convert CSV->NPZ."
+	@echo "      Output: $(MOTIONS_DIR)/<NAME>_final.npz"
+	@echo ""
+	@echo "  make fix-orientation NAME=<name>"
+	@echo "      Fix root yaw and height offset only."
+	@echo ""
+	@echo "  make prepend NAME=<name>"
+	@echo "      Prepend standing-to-motion transition only."
+	@echo ""
+	@echo "  make csv-to-npz NAME=<name>"
+	@echo "      Convert CSV to NPZ (uses _final.csv if exists)."
+	@echo ""
+	@echo "  make visualize NAME=<name>"
+	@echo "      Play with --agent zero to verify motion (no terminations)."
+	@echo ""
+	@echo "  make train    NAME=<name>"
+	@echo "      Train tracking policy on the motion."
+	@echo ""
+	@echo "  make play     NAME=<name> RUN_NAME=<timestamp>"
+	@echo "      Play the trained policy."
+	@echo ""
+	@echo "  make export   RUN_NAME=<timestamp>"
+	@echo "      Export ONNX/MNN release for the run."
+	@echo ""
+	@echo "Optional overrides:"
+	@echo "  ROBOT=pm01|g1               (default: pm01)"
+	@echo "  INPUT_FPS=30  OUTPUT_FPS=100"
+	@echo "  HEIGHT_OFFSET=0.25"
+	@echo "  NUM_ENVS=4096"
+	@echo "  TASK=EngineAI-PM01-Tracking"
+	@echo "  EXPORT_TASK=pm01_tracking"
+
+check-name:
+	@if [ -z "$(NAME)" ]; then echo "ERROR: pass NAME=<motion_basename>"; exit 1; fi
+
+check-csv: check-name
+	@if [ ! -f "$(CSV)" ]; then echo "ERROR: CSV not found: $(CSV)"; exit 1; fi
+
+check-run:
+	@if [ -z "$(RUN_NAME)" ]; then echo "ERROR: pass RUN_NAME=<timestamp>"; exit 1; fi
+
+fix-orientation: check-csv
+	@echo "==> Fix orientation + height ($(HEIGHT_OFFSET)m): $(CSV) -> $(FIXED_CSV)"
+	$(PY) scripts/fix_motion_orientation.py $(CSV) \
+		--output-csv $(FIXED_CSV) \
+		--height-offset $(HEIGHT_OFFSET)
+
+prepend: check-name
+	@if [ ! -f "$(FIXED_CSV)" ]; then echo "ERROR: $(FIXED_CSV) not found. Run 'make fix-orientation' first."; exit 1; fi
+	@echo "==> Prepend standing transition: $(FIXED_CSV) -> $(FINAL_CSV)"
+	$(PY) scripts/prepend_standing.py $(FIXED_CSV) \
+		--output-csv $(FINAL_CSV)
+
+csv-to-npz: check-name
+	@INPUT=$(if $(wildcard $(FINAL_CSV)),$(FINAL_CSV),$(CSV)); \
+	OUTPUT=$(if $(wildcard $(FINAL_CSV)),$(NAME)_final.npz,$(NAME).npz); \
+	echo "==> CSV -> NPZ: $$INPUT -> $(MOTIONS_DIR)/$$OUTPUT"; \
+	$(PY) scripts/csv_to_npz.py \
+		--robot $(ROBOT) \
+		--input-file $$INPUT \
+		--output-name $$OUTPUT \
+		--input-fps $(INPUT_FPS) \
+		--output-fps $(OUTPUT_FPS)
+
+prep: fix-orientation prepend csv-to-npz
+	@echo "==> Done: $(FINAL_NPZ)"
+
+visualize: check-name
+	@echo "==> Visualize motion (no policy): $(MOTION_FILE)"
+	$(PY) scripts/play.py $(TASK) \
+		--motion-file $(MOTION_FILE) \
+		--agent zero \
+		--no-terminations True
+
+train: check-name
+	@echo "==> Train: $(TASK) on $(MOTION_FILE)"
+	$(PY) scripts/train.py $(TASK) \
+		--motion-file $(MOTION_FILE) \
+		--env.scene.num-envs $(NUM_ENVS)
+
+play: check-name check-run
+	@CKPT=$$(ls logs/rsl_rl/$(EXPORT_TASK)/$(RUN_NAME)/model_*.pt | sort -t_ -k2 -n | tail -1); \
+	echo "==> Play: $$CKPT"; \
+	$(PY) scripts/play.py $(TASK) \
+		--motion-file $(MOTION_FILE) \
+		--checkpoint-file $$CKPT
+
+export: check-run
+	@echo "==> Export release: $(EXPORT_TASK)/$(RUN_NAME)"
+	$(PY) scripts/export_release.py $(EXPORT_TASK) $(RUN_NAME)

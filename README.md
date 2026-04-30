@@ -36,6 +36,53 @@ The basic workflow for using reinforcement learning to achieve motion control is
 - **Sim2Real**: Deploy trained policies to physical Unitree robots for real-world execution.
 
 
+## 🚀 Quick Start with Makefile
+
+For BeyondMimic motion tracking, a `Makefile` is provided for one-command pipeline shortcuts.
+
+**Show all available targets:**
+```bash
+make help
+```
+
+**Full pipeline example (jogging motion):**
+```bash
+# 1. Prepare motion (fix orientation + height, prepend standing transition, convert to NPZ)
+make prep NAME=Jog_3_stageii
+
+# 2. Visualize the prepared motion (no policy, just check the reference)
+make visualize NAME=Jog_3_stageii
+
+# 3. Train tracking policy
+make train NAME=Jog_3_stageii
+
+# 4. Play trained policy
+make play NAME=Jog_3_stageii RUN_NAME=2026-05-01_12-34-56
+
+# 5. Export release (ONNX, MNN, params, motion NPZ)
+make export RUN_NAME=2026-05-01_12-34-56
+```
+
+**Individual steps** (if you only need part of the pipeline):
+```bash
+make fix-orientation NAME=Jog_3_stageii
+make prepend NAME=Jog_3_stageii
+make csv-to-npz NAME=Jog_3_stageii
+```
+
+**Common overrides:**
+```bash
+make prep NAME=Jog_3_stageii HEIGHT_OFFSET=0.20
+make train NAME=Jog_3_stageii NUM_ENVS=8192
+make play NAME=Jog_3_stageii RUN_NAME=<run> TASK=EngineAI-PM01-Tracking
+```
+
+The Makefile auto-uses `<NAME>_final.npz` (after `make prep`) if available, otherwise falls back to `<NAME>.npz`.
+
+For full retargeting from human mocap (AMASS) to robot motion, see [docs/beyondmimic_training_guide.md](docs/beyondmimic_training_guide.md).
+
+---
+
 ## 🛠️ Usage Guide
 
 ### 1. Velocity Tracking Training
