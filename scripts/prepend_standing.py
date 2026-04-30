@@ -58,6 +58,12 @@ def main():
                       help="Duration to hold standing pose before transition (default: 0.5s)")
   parser.add_argument("--fps", type=float, default=30.0,
                       help="Frame rate of the CSV file (default: 30)")
+  parser.add_argument("--start-frame", type=int, default=None,
+                      help="Use this frame as the motion entry (default: auto/best). Use 0 for raw frame 0.")
+  parser.add_argument("--auto-best-entry", action="store_true",
+                      help="Auto-pick motion frame closest to standing pose as entry.")
+  parser.add_argument("--search-window", type=int, default=60,
+                      help="Window of frames to search for best entry (default: 60).")
   args = parser.parse_args()
 
   # Load original motion.
@@ -76,6 +82,24 @@ def main():
   if skip > 0:
     motion = motion[skip:]
     print(f"Using {motion.shape[0]} frames after skipping")
+
+  # Pick the motion entry frame.
+  num_joints = motion.shape[1] - 7
+  home_joints = HOME_JOINTS[:num_joints]
+  if args.start_frame is not None:
+    entry = args.start_frame
+    print(f"Using fixed start frame: {entry}")
+  elif args.auto_best_entry:
+    window = min(args.search_window, motion.shape[0])
+    diffs = np.linalg.norm(motion[:window, 7:] - home_joints, axis=1)
+    entry = int(np.argmin(diffs))
+    print(f"Auto-best entry: frame {entry} (joint diff={diffs[entry]:.3f}, frame 0 diff={diffs[0]:.3f})")
+  else:
+    entry = 0
+    print(f"Using default start frame: 0")
+  if entry > 0:
+    motion = motion[entry:]
+    print(f"Skipped {entry} frames; using {motion.shape[0]} frames")
 
   # Build home frame matching CSV format.
   home_frame = np.zeros(motion.shape[1])

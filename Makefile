@@ -11,6 +11,17 @@ INPUT_FPS   ?= 30
 OUTPUT_FPS  ?= 100
 HEIGHT_OFFSET ?= 0.25
 NUM_ENVS    ?= 4096
+HOLD_SECS   ?= 0.5
+TRANS_SECS  ?= 1.5
+START_FRAME ?=
+AUTO_BEST   ?=
+PREPEND_FLAGS := --hold-seconds $(HOLD_SECS) --transition-seconds $(TRANS_SECS) --fps $(INPUT_FPS)
+ifneq ($(strip $(START_FRAME)),)
+PREPEND_FLAGS += --start-frame $(START_FRAME)
+endif
+ifneq ($(strip $(AUTO_BEST)),)
+PREPEND_FLAGS += --auto-best-entry
+endif
 TASK        ?= EngineAI-PM01-Tracking
 EXPORT_TASK ?= pm01_tracking
 RUN_NAME    ?=
@@ -54,6 +65,9 @@ help:
 	@echo "  ROBOT=pm01|g1               (default: pm01)"
 	@echo "  INPUT_FPS=30  OUTPUT_FPS=100"
 	@echo "  HEIGHT_OFFSET=0.25"
+	@echo "  HOLD_SECS=0.5  TRANS_SECS=1.5    Standing hold + transition seconds"
+	@echo "  START_FRAME=<n>             Use motion frame n as entry (skip frames 0..n-1)"
+	@echo "  AUTO_BEST=1                 Auto-pick motion frame closest to standing pose"
 	@echo "  NUM_ENVS=4096"
 	@echo "  TASK=EngineAI-PM01-Tracking"
 	@echo "  EXPORT_TASK=pm01_tracking"
@@ -77,7 +91,8 @@ prepend: check-name
 	@if [ ! -f "$(FIXED_CSV)" ]; then echo "ERROR: $(FIXED_CSV) not found. Run 'make fix-orientation' first."; exit 1; fi
 	@echo "==> Prepend standing transition: $(FIXED_CSV) -> $(FINAL_CSV)"
 	$(PY) scripts/prepend_standing.py $(FIXED_CSV) \
-		--output-csv $(FINAL_CSV)
+		--output-csv $(FINAL_CSV) \
+		$(PREPEND_FLAGS)
 
 csv-to-npz: check-name
 	@INPUT=$(if $(wildcard $(FINAL_CSV)),$(FINAL_CSV),$(CSV)); \
