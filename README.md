@@ -61,6 +61,9 @@ make play NAME=Jog_3_stageii RUN_NAME=2026-05-01_12-34-56
 
 # 5. Export release (ONNX, MNN, params, motion NPZ)
 make export RUN_NAME=2026-05-01_12-34-56
+
+# Or convert a single ONNX to MNN standalone
+make mnn ONNX_FILE=logs/rsl_rl/pm01_tracking/<run>/policy.onnx
 ```
 
 **Individual steps** (if you only need part of the pipeline):
@@ -69,6 +72,28 @@ make fix-orientation NAME=Jog_3_stageii
 make prepend NAME=Jog_3_stageii
 make csv-to-npz NAME=Jog_3_stageii
 ```
+
+**Prepend tuning** (for `make prep` / `make prepend`):
+```bash
+# Default: smooth interpolation from standing to motion frame 0
+make prep NAME=<name>
+
+# Auto-pick motion frame closest to standing pose
+make prep NAME=<name> AUTO_BEST=1
+
+# Skip first N motion frames (e.g., trim mocap wind-up)
+make prep NAME=<name> START_FRAME=30
+
+# Align entry frame yaw to 0 to prevent body twist during transition
+make prep NAME=<name> ALIGN_YAW=1
+
+# Tune timing
+make prep NAME=<name> HOLD_SECS=1.0 TRANS_SECS=2.0
+```
+
+> Note: For dynamic locomotion (running, jogging), training works better
+> **without** the prepended standing transition. Train directly on the raw
+> NPZ and let the FSM handle pd_stand → motion at runtime.
 
 **Common overrides:**
 ```bash
