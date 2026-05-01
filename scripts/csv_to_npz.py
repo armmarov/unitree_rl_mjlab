@@ -3,6 +3,7 @@ from typing import Any
 import numpy as np
 import torch
 import tyro
+import os
 from tqdm import tqdm
 
 import mjlab
@@ -11,7 +12,8 @@ from mjlab.scene import Scene
 from mjlab.sim.sim import Simulation, SimulationCfg
 from typing import Literal
 
-from mjlab.tasks.tracking.config.g1.env_cfgs import unitree_g1_flat_tracking_env_cfg
+from src.tasks.tracking.config.g1.env_cfgs import unitree_g1_flat_tracking_env_cfg
+from src.tasks.tracking.config.g1_23dof.env_cfgs import unitree_g1_23dof_flat_tracking_env_cfg
 from src.tasks.tracking.config.pm01.env_cfgs import engineai_pm01_flat_tracking_env_cfg
 from mjlab.utils.lab_api.math import (
   axis_angle_from_quat,
@@ -190,11 +192,10 @@ def run_sim(
   input_file,
   input_fps,
   output_fps,
-  output_name,
+  output_path,
   render,
   line_range,
   renderer: OffscreenRenderer | None = None,
-  output_dir: str = "./src/assets/motions/g1",
 ):
   motion = MotionLoader(
     motion_file=input_file,
@@ -308,9 +309,7 @@ def run_sim(
           "body_ang_vel_w",
         ):
           log[k] = np.stack(log[k], axis=0)
-        import os
-        os.makedirs(output_dir, exist_ok=True)
-        np.savez(f"{output_dir}/{output_name}", **log)  # type: ignore[arg-type]
+        np.savez(output_path, **log)  # type: ignore[arg-type]
 
 
 PM01_JOINT_NAMES = [
@@ -372,11 +371,37 @@ G1_JOINT_NAMES = [
   "right_wrist_yaw_joint",
 ]
 
+G1_23DOF_JOINT_NAMES = [
+  "left_hip_pitch_joint",
+  "left_hip_roll_joint",
+  "left_hip_yaw_joint",
+  "left_knee_joint",
+  "left_ankle_pitch_joint",
+  "left_ankle_roll_joint",
+  "right_hip_pitch_joint",
+  "right_hip_roll_joint",
+  "right_hip_yaw_joint",
+  "right_knee_joint",
+  "right_ankle_pitch_joint",
+  "right_ankle_roll_joint",
+  "waist_yaw_joint",
+  "left_shoulder_pitch_joint",
+  "left_shoulder_roll_joint",
+  "left_shoulder_yaw_joint",
+  "left_elbow_joint",
+  "left_wrist_roll_joint",
+  "right_shoulder_pitch_joint",
+  "right_shoulder_roll_joint",
+  "right_shoulder_yaw_joint",
+  "right_elbow_joint",
+  "right_wrist_roll_joint",
+]
+
 
 def main(
   input_file: str,
   output_name: str,
-  robot: Literal["g1", "pm01"] = "g1",
+  robot: Literal["g1", "g1_23dof", "pm01"] = "g1",
   input_fps: float = 30.0,
   output_fps: float = 50.0,
   device: str = "cuda:0",
@@ -388,7 +413,7 @@ def main(
   Args:
     input_file: Path to the input CSV file.
     output_name: Path to the output npz file.
-    robot: Robot type ("g1" or "pm01").
+    robot: Robot type ("g1", "g1_23dof", "pm01").
     input_fps: Frame rate of the CSV file.
     output_fps: Desired output frame rate.
     device: Device to use.
@@ -399,15 +424,22 @@ def main(
     env_cfg = engineai_pm01_flat_tracking_env_cfg()
     joint_names = PM01_JOINT_NAMES
     output_dir = "./src/assets/motions/pm01"
-  else:
+  elif robot == "g1_23dof":
+    env_cfg = unitree_g1_23dof_flat_tracking_env_cfg()
+    joint_names = G1_23DOF_JOINT_NAMES
+    output_dir = "./src/assets/motions/g1_23dof"
+  elif robot == "g1":
     env_cfg = unitree_g1_flat_tracking_env_cfg()
     joint_names = G1_JOINT_NAMES
     output_dir = "./src/assets/motions/g1"
+  else:
+    raise ValueError(f"Unsupported robot: {robot}")
 
   sim_cfg = SimulationCfg()
   sim_cfg.mujoco.timestep = 1.0 / output_fps
 
   scene = Scene(env_cfg.scene, device=device)
+
   model = scene.compile()
 
   sim = Simulation(num_envs=1, cfg=sim_cfg, model=model, device=device)
@@ -430,6 +462,10 @@ def main(
       scene=scene,
     )
     renderer.initialize()
+  os.makedirs(output_dir, exist_ok=True)
+  if not output_name.endswith(".npz"):
+    output_name += ".npz"
+  output_path = os.path.join(output_dir, output_name)
 
   run_sim(
     sim=sim,
@@ -438,11 +474,10 @@ def main(
     input_fps=input_fps,
     input_file=input_file,
     output_fps=output_fps,
-    output_name=output_name,
+    output_path=output_path,
     render=render,
     line_range=line_range,
     renderer=renderer,
-    output_dir=output_dir,
   )
 
 

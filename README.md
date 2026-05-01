@@ -4,7 +4,7 @@
 ## ✳️ Overview
 Unitree RL Mjlab is a reinforcement learning project built upon the
 [mjlab](https://github.com/mujocolab/mjlab.git), using MuJoCo as its 
-physics simulation backend, currently supporting Unitree Go2, A2, G1, H1_2 and R1.
+physics simulation backend, currently supporting Unitree Go2, A2, As2, G1, R1, H1_2 and H2.
 
 Mjlab combines [Isaac Lab](https://github.com/isaac-sim/IsaacLab)'s proven API
 with best-in-class [MuJoCo](https://github.com/google-deepmind/mujoco_warp)
@@ -184,6 +184,7 @@ python scripts/csv_to_npz.py \
   --output-name dance1_subject2.npz \
   --input-fps 30 \
   --output-fps 50
+# Use --robot g1_23dof for the 23-DOF G1 variant.
 ```
 
 **EngineAI PM01:**
@@ -215,6 +216,7 @@ python scripts/train.py EngineAI-PM01-Tracking \
 Available motion imitation tasks:
   - Unitree-G1-Tracking
   - Unitree-G1-Tracking-No-State-Estimation
+  - Unitree-G1-23Dof-Tracking-No-State-Estimation
   - EngineAI-PM01-Tracking
 
 </div>
@@ -250,6 +252,7 @@ python scripts/play.py EngineAI-PM01-Flat --checkpoint_file=logs/rsl_rl/pm01_vel
 Motion imitation:
 ```bash
 python scripts/play.py Unitree-G1-Tracking --motion_file=src/assets/motions/g1/dance1_subject2.npz --checkpoint_file=logs/rsl_rl/g1_tracking/2026-xx-xx_xx-xx-xx/model_xx.pt
+python scripts/play.py Unitree-G1-23Dof-Tracking-No-State-Estimation --motion_file=src/assets/motions/g1_23dof/dance1_subject2.npz --checkpoint_file=logs/rsl_rl/g1_23dof_tracking/2026-xx-xx_xx-xx-xx/model_xx.pt
 python scripts/play.py EngineAI-PM01-Tracking --motion_file=src/assets/motions/pm01/pm01_motion.npz --checkpoint_file=logs/rsl_rl/pm01_tracking/2026-xx-xx_xx-xx-xx/model_xx.pt
 ```
 
