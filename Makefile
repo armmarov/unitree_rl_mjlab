@@ -35,7 +35,7 @@ PY          ?= python
 MOTION_FILE ?= $(if $(wildcard $(FINAL_NPZ)),$(FINAL_NPZ),$(NPZ))
 
 .PHONY: help fix-orientation prepend csv-to-npz prep visualize \
-        train play export check-name check-csv check-run
+        train play export mnn check-name check-csv check-run
 
 help:
 	@echo "Targets (specify NAME=<motion_basename>):"
@@ -63,7 +63,10 @@ help:
 	@echo "      Play the trained policy."
 	@echo ""
 	@echo "  make export   RUN_NAME=<timestamp>"
-	@echo "      Export ONNX/MNN release for the run."
+	@echo "      Export ONNX/MNN release for the run (full release folder)."
+	@echo ""
+	@echo "  make mnn      ONNX_FILE=<path/to/policy.onnx> [MNN_OUT=<output.mnn>]"
+	@echo "      Convert a single ONNX file to MNN format."
 	@echo ""
 	@echo "Optional overrides:"
 	@echo "  ROBOT=pm01|g1               (default: pm01)"
@@ -135,3 +138,21 @@ play: check-name check-run
 export: check-run
 	@echo "==> Export release: $(EXPORT_TASK)/$(RUN_NAME)"
 	$(PY) scripts/export_release.py $(EXPORT_TASK) $(RUN_NAME)
+
+# Standalone MNN conversion (also runs as part of `export`).
+MNN_CONVERT ?= $(shell command -v mnnconvert 2>/dev/null || echo /home/armmarov/work/robot/engineai/engineai_rl_workspace/venv/bin/mnnconvert)
+ONNX_FILE   ?=
+MNN_OUT     ?= $(basename $(ONNX_FILE)).mnn
+
+mnn:
+	@if [ -z "$(ONNX_FILE)" ]; then \
+		echo "ERROR: pass ONNX_FILE=<path/to/policy.onnx>"; \
+		echo "Example: make mnn ONNX_FILE=logs/rsl_rl/pm01_tracking/<run>/policy.onnx"; \
+		exit 1; fi
+	@if [ ! -f "$(ONNX_FILE)" ]; then echo "ERROR: ONNX not found: $(ONNX_FILE)"; exit 1; fi
+	@if [ ! -x "$(MNN_CONVERT)" ] && ! command -v $(MNN_CONVERT) >/dev/null 2>&1; then \
+		echo "ERROR: mnnconvert not found. Install via: pip install MNN"; exit 1; fi
+	@echo "==> ONNX -> MNN: $(ONNX_FILE) -> $(MNN_OUT)"
+	$(MNN_CONVERT) -f ONNX --modelFile $(ONNX_FILE) --MNNModel $(MNN_OUT) --bizCode biz
+	@rm -f .__convert_external_data.bin
+	@echo "==> Done: $(MNN_OUT)"
