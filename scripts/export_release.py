@@ -108,22 +108,24 @@ def main():
       shutil.copy2(f, release_params / f.name)
       print(f"  Copied: params/{f.name}")
 
-  # Copy bundled ONNX for tracking tasks (policy + motion data).
-  if "tracking" in args.task:
-    bundled = list(run_dir.glob("20*.onnx"))
-    for f in bundled:
-      shutil.copy2(f, release_dir / "policy_bundled.onnx")
-      print(f"  Copied: {f.name} → policy_bundled.onnx (policy + motion for deployment)")
-      if not args.no_mnn:
-        bundled_mnn = release_dir / "policy_bundled.mnn"
-        if convert_to_mnn(release_dir / "policy_bundled.onnx", bundled_mnn):
-          print(f"  Created: policy_bundled.mnn")
-        else:
-          print(f"  Warning: Bundled MNN conversion failed")
+  # Detect tracking-style runs by presence of bundled ONNX (named like a timestamp).
+  bundled = [f for f in run_dir.glob("20*.onnx")]
+  is_tracking = bool(bundled) or "tracking" in args.task
 
-  # Copy motion NPZ for tracking tasks.
-  if "tracking" in args.task:
-    robot = "pm01" if "pm01" in args.task else "g1"
+  # Copy bundled ONNX (policy + motion data).
+  for f in bundled:
+    shutil.copy2(f, release_dir / "policy_bundled.onnx")
+    print(f"  Copied: {f.name} → policy_bundled.onnx (policy + motion for deployment)")
+    if not args.no_mnn:
+      bundled_mnn = release_dir / "policy_bundled.mnn"
+      if convert_to_mnn(release_dir / "policy_bundled.onnx", bundled_mnn):
+        print(f"  Created: policy_bundled.mnn")
+      else:
+        print(f"  Warning: Bundled MNN conversion failed")
+
+  # Copy motion NPZ for tracking-style tasks.
+  if is_tracking:
+    robot = "g1" if "g1" in args.task else "pm01"
     motions_dir = Path(f"src/assets/motions/{robot}")
     if motions_dir.exists():
       for npz_file in motions_dir.glob("*.npz"):
