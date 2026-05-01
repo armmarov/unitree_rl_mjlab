@@ -123,14 +123,28 @@ def main():
       else:
         print(f"  Warning: Bundled MNN conversion failed")
 
-  # Copy motion NPZ for tracking-style tasks.
+  # Copy ONLY the motion NPZ used for this run (read from env.yaml).
   if is_tracking:
-    robot = "g1" if "g1" in args.task else "pm01"
-    motions_dir = Path(f"src/assets/motions/{robot}")
-    if motions_dir.exists():
-      for npz_file in motions_dir.glob("*.npz"):
-        shutil.copy2(npz_file, release_dir / npz_file.name)
-        print(f"  Copied: {npz_file.name} (motion data)")
+    motion_file = None
+    env_yaml = run_dir / "params" / "env.yaml"
+    if env_yaml.exists():
+      with open(env_yaml) as f:
+        for line in f:
+          if "motion_file:" in line:
+            val = line.split("motion_file:", 1)[1].strip().strip("'\"")
+            if val and val.lower() != "null" and val.lower() != "none":
+              motion_file = val
+              break
+
+    if motion_file:
+      motion_path = Path(motion_file)
+      if motion_path.exists():
+        shutil.copy2(motion_path, release_dir / motion_path.name)
+        print(f"  Copied: {motion_path.name} (motion data used in training)")
+      else:
+        print(f"  Warning: Motion file from env.yaml not found: {motion_file}")
+    else:
+      print(f"  Warning: Could not detect motion_file from env.yaml")
 
   print(f"\nRelease exported to: {release_dir}")
 
