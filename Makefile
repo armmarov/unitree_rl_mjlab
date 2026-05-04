@@ -129,7 +129,7 @@ train: check-name
 		--env.scene.num-envs $(NUM_ENVS)
 
 play: check-name check-run
-	@CKPT=$$(ls logs/rsl_rl/$(EXPORT_TASK)/$(RUN_NAME)/model_*.pt | sort -t_ -k2 -n | tail -1); \
+	@CKPT=$$(ls logs/rsl_rl/$(EXPORT_TASK)/$(RUN_NAME)/model_*.pt | awk -F'model_|\\.pt' '{printf "%010d %s\n", $$2, $$0}' | sort -n | tail -1 | cut -d' ' -f2-); \
 	echo "==> Play: $$CKPT"; \
 	$(PY) scripts/play.py $(TASK) \
 		--motion-file $(MOTION_FILE) \
