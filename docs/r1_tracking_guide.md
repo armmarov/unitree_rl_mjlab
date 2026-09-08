@@ -27,7 +27,40 @@ There are no state-estimation variants of the velocity tasks — only the tracki
 
 The only motion file bundled here, `src/assets/motions/r1/standing.npz`, is a **synthetic single static standing pose** (R1's built-in `HOME_KEYFRAME`) baked through real forward kinematics. Its body/joint trajectories are real and correctly shaped, but the "motion" is just standing still — no locomotion, nothing interesting. It exists purely to validate that the tracking pipeline (env, rewards, PPO loop) runs end-to-end. A policy trained on it will just learn to hold a standing pose.
 
-Real R1 motion capture is now possible: R1 support was added to GMR (the retargeting pipeline that maps human SMPL-X mocap onto a robot skeleton), on GMR's `r1-support` branch (`/home/armmarov/work/robot/GMR`). See `GMR/R1_RETARGETING_GUIDE.md` for the full pipeline — it retargets a human motion clip and lands a ready-to-train NPZ directly in `src/assets/motions/r1/` via `make retarget MJLAB_ROBOT=r1 ...`. Note that pipeline's mjlab-side step depends on `csv_to_npz.py`'s `--robot r1` support, which only exists on **this branch** (`r1-tracking`) — make sure this repo stays on `r1-tracking` when running it.
+Real R1 motion capture is now possible: R1 support was added to GMR (the retargeting pipeline that maps human SMPL-X mocap onto a robot skeleton), on GMR's `r1-support` branch (`/home/armmarov/work/robot/GMR`). Full details are in `GMR/R1_RETARGETING_GUIDE.md`; the essentials:
+
+GMR has no separate Python env — it's installed inside this repo's own venv, so every GMR command below uses `/home/armmarov/work/robot/unitree/unitree_rl_mjlab/venv/bin/python`.
+
+**Live preview** (needs a display):
+
+```bash
+cd /home/armmarov/work/robot/GMR
+/home/armmarov/work/robot/unitree/unitree_rl_mjlab/venv/bin/python scripts/smplx_to_robot.py \
+  --smplx_file assets/motions/HumanEva/S1/Static_stageii.npz \
+  --robot unitree_r1 \
+  --loop --rate_limit
+```
+
+(Swap in any `.npz` under `GMR/assets/motions/`.)
+
+**Full pipeline — SMPL-X straight to a training-ready NPZ**, via GMR's `make retarget`:
+
+```bash
+cd /home/armmarov/work/robot/GMR
+make retarget \
+  NPZ=assets/motions/HumanEva/S1/Static_stageii.npz \
+  ROBOT=unitree_r1 \
+  MJLAB_ROBOT=r1 \
+  MJLAB_DEST=r1 \
+  NAME=static_test \
+  MJLAB=/home/armmarov/work/robot/unitree/unitree_rl_mjlab \
+  PY=/home/armmarov/work/robot/unitree/unitree_rl_mjlab/venv/bin/python \
+  MJLAB_PY=/home/armmarov/work/robot/unitree/unitree_rl_mjlab/venv/bin/python
+```
+
+This lands the result at `src/assets/motions/r1/static_test.npz` in this repo, ready to train on directly (see the Training section below).
+
+**Cross-repo branch caveat:** the pipeline's mjlab-side step depends on `csv_to_npz.py`'s `--robot r1` support, which only exists on **this branch** (`r1-tracking`) — make sure this repo stays on `r1-tracking` when running `make retarget`.
 
 ## Training
 
