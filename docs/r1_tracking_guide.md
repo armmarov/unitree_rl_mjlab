@@ -269,4 +269,13 @@ Closing the gap would require:
 3. Creating `deploy/robots/r1/config/policy/tracking/<motion_name>/{exported/{policy.onnx,policy.onnx.data}, params/{deploy.yaml,<motion_name>.npz}}`.
 4. Rebuilding via cmake/make.
 
-This is real, non-trivial C++ engineering work that has not been started — it is not a copy-paste job. Combined with the missing GMR retargeting support for R1, both the motion-data side and the deployment side of R1 tracking are open items.
+This is real, non-trivial C++ engineering work that has not been started — it is not a copy-paste job.
+
+**Sim→real joint mapping is already confirmed, though — this part does not need re-deriving.** The `r1-edu` project (working from `unitree_sdk2`'s `R1JointIndex` enum and `example/r1/low_level/r1_ankle_swing_example.cpp`) cross-checked the existing `joint_ids_map` in `deploy/robots/r1/config/policy/velocity/v0/params/deploy.yaml` against the real robot's IDL layout and confirmed an exact, index-for-index and name-for-name match. Findings relevant to a future tracking deploy port:
+
+- The 24-entry `joint_ids_map` (`[0,1,...,13,15,...,19,22,...,26]`) is correct as-is and can be reused directly for tracking — no need to re-derive it.
+- The 3 gaps (IDL slots 14, 20, 21) are real, unmodeled hardware DOF on fuller variants of R1 (likely a 3rd waist axis at 14, and reserved wrist pitch/yaw at 20/21) that this sim's 24-joint body doesn't drive. When writing the deploy loop's full IDL motor-command array, these slots must be left untouched or explicitly zeroed with mode=0 (disabled) — never left uninitialized.
+- `mode_pr` should be **0 (PR mode)** — this sim's joint naming (`ankle_pitch`/`ankle_roll`) matches R1's Pitch/Roll actuator interpretation, not the AB parallel-linkage interpretation.
+- `mode_machine` is a **read-only field the robot reports** (`low_state.mode_machine()`), not something to configure — the deploy loop should read it at startup and sanity-check it matches a 24-joint-compatible variant before enabling control, rather than hardcoding an assumed value.
+
+Combined with the missing `State_Mimic` port above, the motion-data side of R1 tracking is now solved (see the GMR section above), but the deployment side is still an open item — though a meaningfully de-risked one now that the joint mapping is verified rather than assumed.
