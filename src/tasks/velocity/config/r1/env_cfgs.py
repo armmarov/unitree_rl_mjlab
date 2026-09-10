@@ -23,7 +23,12 @@ def unitree_r1_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   cfg.sim.contact_sensor_maxmatch = 500
   cfg.sim.nconmax = 48
 
-  cfg.scene.entities = {"robot": get_r1_robot_cfg()}
+  # delayed=True: velocity policies deploy through a real DDS-mediated control
+  # loop (r1_ctrl <-> unitree_mujoco), which has latency the plain (instant-
+  # action) actuator model never trains against. See r1_constants.py's
+  # R1_ARTICULATION_DELAYED docstring/comment for why this is opt-in per-task
+  # rather than the shared default.
+  cfg.scene.entities = {"robot": get_r1_robot_cfg(delayed=True)}
 
   # Set raycast sensor frame to R1 pelvis.
   for sensor in cfg.scene.sensors or ():
@@ -75,6 +80,11 @@ def unitree_r1_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   twist_cmd = cfg.commands["twist"]
   assert isinstance(twist_cmd, UniformVelocityCommandCfg)
   twist_cmd.viz.z_offset = 1.05
+  # Default 0.05 gives the policy little training exposure to holding a clean
+  # stop; raised for R1 so walk-to-stop settling gets reinforced more often.
+  twist_cmd.rel_standing_envs = 0.20
+
+  cfg.rewards["stand_still"].weight = -3.0
 
   cfg.observations["critic"].terms["foot_height"].params[
     "asset_cfg"

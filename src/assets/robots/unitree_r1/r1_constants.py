@@ -5,7 +5,7 @@ from pathlib import Path
 import mujoco
 
 from src import SRC_PATH
-from mjlab.actuator import BuiltinPositionActuatorCfg
+from mjlab.actuator import BuiltinPositionActuatorCfg, DelayedActuatorCfg
 from mjlab.entity import EntityArticulationInfoCfg, EntityCfg
 from mjlab.utils.os import update_assets
 from mjlab.utils.spec_config import CollisionCfg
@@ -91,6 +91,74 @@ R1_ACTUATOR_WRIST = BuiltinPositionActuatorCfg(
 
 
 ##
+# Delayed actuator wrappers, for deploy-loop latency robustness.
+##
+# R1_ACTUATOR_* above stay untouched (R1_ACTION_SCALE below asserts
+# isinstance(a, BuiltinPositionActuatorCfg) and reads .effort_limit/.stiffness
+# directly, which DelayedActuatorCfg does not expose). These _DELAYED variants
+# wrap them for use in R1_ARTICULATION instead.
+#
+# Physics timestep is 0.005s, decimation 4 -> 50Hz control (matches
+# deploy/robots/r1/config/policy/velocity/v0/params/deploy.yaml's step_dt=0.02).
+# So 1 lag unit = 5ms. delay_min_lag/delay_max_lag below (0-8 steps = 0-40ms)
+# are not a measured figure -- we have not instrumented our actual
+# r1_ctrl/unitree_mujoco DDS round-trip latency. Widened from an initial 0-4
+# (0-20ms) guess per r1-rl's review: RL domain-randomization practice favors
+# training for a wider margin than a naive latency point-estimate, since
+# deploy-time jitter (thread scheduling, etc.) tends to spike above it.
+# delay_update_period=20 (~0.1s) resamples periodically rather than either
+# fully-fixed-per-episode or independent per-physics-step white noise.
+# Reviewed by r1-rl 2026-09-08; R1_ARTICULATION scoping issue they flagged
+# (this used to default-apply to both Velocity and Tracking) is fixed below --
+# see R1_ARTICULATION_DELAYED.
+R1_ACTUATOR_LEG_DELAYED = DelayedActuatorCfg(
+  base_cfg=R1_ACTUATOR_LEG,
+  delay_target="position",
+  delay_min_lag=0,
+  delay_max_lag=8,
+  delay_hold_prob=0.0,
+  delay_update_period=20,
+  delay_per_env_phase=True,
+)
+R1_ACTUATOR_ANKLE_DELAYED = DelayedActuatorCfg(
+  base_cfg=R1_ACTUATOR_ANKLE,
+  delay_target="position",
+  delay_min_lag=0,
+  delay_max_lag=8,
+  delay_hold_prob=0.0,
+  delay_update_period=20,
+  delay_per_env_phase=True,
+)
+R1_ACTUATOR_WAIST_DELAYED = DelayedActuatorCfg(
+  base_cfg=R1_ACTUATOR_WAIST,
+  delay_target="position",
+  delay_min_lag=0,
+  delay_max_lag=8,
+  delay_hold_prob=0.0,
+  delay_update_period=20,
+  delay_per_env_phase=True,
+)
+R1_ACTUATOR_ARM_DELAYED = DelayedActuatorCfg(
+  base_cfg=R1_ACTUATOR_ARM,
+  delay_target="position",
+  delay_min_lag=0,
+  delay_max_lag=8,
+  delay_hold_prob=0.0,
+  delay_update_period=20,
+  delay_per_env_phase=True,
+)
+R1_ACTUATOR_WRIST_DELAYED = DelayedActuatorCfg(
+  base_cfg=R1_ACTUATOR_WRIST,
+  delay_target="position",
+  delay_min_lag=0,
+  delay_max_lag=8,
+  delay_hold_prob=0.0,
+  delay_update_period=20,
+  delay_per_env_phase=True,
+)
+
+
+##
 # Keyframe config.
 ##
 
@@ -158,27 +226,49 @@ R1_ARTICULATION = EntityArticulationInfoCfg(
   soft_joint_pos_limit_factor=0.9,
 )
 
+# Delay-robust variant, opt-in only (get_r1_robot_cfg(delayed=True)). R1_ARTICULATION
+# above stays the plain version since get_r1_robot_cfg() is shared by both the
+# velocity and tracking tasks (see src/tasks/{velocity,tracking}/config/r1/env_cfgs.py) --
+# defaulting it to delayed would have silently changed Tracking's actuator model too.
+R1_ARTICULATION_DELAYED = EntityArticulationInfoCfg(
+  actuators=(
+    R1_ACTUATOR_LEG_DELAYED,
+    R1_ACTUATOR_ANKLE_DELAYED,
+    R1_ACTUATOR_WAIST_DELAYED,
+    R1_ACTUATOR_ARM_DELAYED,
+    R1_ACTUATOR_WRIST_DELAYED,
+  ),
+  soft_joint_pos_limit_factor=0.9,
+)
 
-def get_r1_robot_cfg() -> EntityCfg:
+
+def get_r1_robot_cfg(delayed: bool = False) -> EntityCfg:
   """Get a fresh R1 robot configuration instance.
 
   Returns a new EntityCfg instance each time to avoid mutation issues when
   the config is shared across multiple places.
+
+  Args:
+    delayed: use R1_ARTICULATION_DELAYED (randomized actuator delay, for
+      deploy-loop latency robustness) instead of the plain R1_ARTICULATION.
+      Defaults to False so existing callers (e.g. the tracking task) are
+      unaffected; pass True explicitly (e.g. from the velocity task) to opt in.
   """
   return EntityCfg(
     init_state=HOME_KEYFRAME,
     collisions=(FULL_COLLISION,),
     spec_fn=get_spec,
-    articulation=R1_ARTICULATION,
+    articulation=R1_ARTICULATION_DELAYED if delayed else R1_ARTICULATION,
   )
 
 
 R1_ACTION_SCALE: dict[str, float] = {}
 for a in R1_ARTICULATION.actuators:
-  assert isinstance(a, BuiltinPositionActuatorCfg)
-  e = a.effort_limit
-  s = a.stiffness
-  names = a.target_names_expr
+  base = a.base_cfg if isinstance(a, DelayedActuatorCfg) else a
+  assert isinstance(base, BuiltinPositionActuatorCfg)
+  e = base.effort_limit
+  s = base.stiffness
+  names = base.target_names_expr
   assert e is not None
   for n in names:
     R1_ACTION_SCALE[n] = 0.25 * e / s
