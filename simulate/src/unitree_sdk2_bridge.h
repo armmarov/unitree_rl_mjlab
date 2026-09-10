@@ -179,7 +179,8 @@ public:
         {
             std::lock_guard<std::mutex> lock(lowcmd->mutex_);
             for(int i(0); i<num_motor_; i++) {
-                auto & m = lowcmd->msg_.motor_cmd()[i];
+                int idl_idx = param::config.joint_ids_map.empty() ? i : param::config.joint_ids_map[i];
+                auto & m = lowcmd->msg_.motor_cmd()[idl_idx];
                 mj_data_->ctrl[i] = m.tau() +
                                     m.kp() * (m.q() - mj_data_->sensordata[i]) +
                                     m.kd() * (m.dq() - mj_data_->sensordata[i + num_motor_]);
@@ -189,9 +190,10 @@ public:
         // lowstate
         if(lowstate->trylock()) {
             for(int i(0); i<num_motor_; i++) {
-                lowstate->msg_.motor_state()[i].q() = mj_data_->sensordata[i];
-                lowstate->msg_.motor_state()[i].dq() = mj_data_->sensordata[i + num_motor_];
-                lowstate->msg_.motor_state()[i].tau_est() = mj_data_->sensordata[i + 2 * num_motor_];
+                int idl_idx = param::config.joint_ids_map.empty() ? i : param::config.joint_ids_map[i];
+                lowstate->msg_.motor_state()[idl_idx].q() = mj_data_->sensordata[i];
+                lowstate->msg_.motor_state()[idl_idx].dq() = mj_data_->sensordata[i + num_motor_];
+                lowstate->msg_.motor_state()[idl_idx].tau_est() = mj_data_->sensordata[i + 2 * num_motor_];
             }
             
             if(imu_quat_adr_ >= 0) {
@@ -266,6 +268,17 @@ public:
             if (g1_lowstate) {
                 auto scene = param::config.robot_scene.filename().string();
                 g1_lowstate->msg_.mode_machine() = scene.find("23") != std::string::npos ? 4 : 5;
+            }
+        } else if (param::config.robot.find("r1") != std::string::npos) {
+            auto* r1_lowstate = dynamic_cast<unitree::robot::g1::publisher::LowState*>(lowstate.get());
+            if (r1_lowstate) {
+                // deploy/robots/r1/main.cc hardcodes mode_machine()=1 and rejects any mismatch
+                // (check_mode_machine). The official R1 docs describe mode_machine 4/5/6 for the
+                // 23/27/29-DoF hardware variants, which does not match that "1" -- unresolved,
+                // flagged separately. Reporting 1 here so this simulated R1 actually passes
+                // r1_ctrl's existing startup check; update both sides together if that gets
+                // clarified against real hardware.
+                r1_lowstate->msg_.mode_machine() = 1;
             }
         }
 

@@ -26,6 +26,13 @@ inline struct SimulationConfig
     int enable_elastic_band;
     int band_attached_link = 0;
 
+    // Optional: maps this robot's compact 0..num_motor_-1 MuJoCo actuator/sensor index to the
+    // real robot's raw LowCmd_/LowState_ IDL motor_cmd()/motor_state() slot (which may have
+    // reserved/unpopulated gaps, e.g. R1's slots 14/20/21). Only needed when the sim's actuator
+    // list is a gapless compaction of a gapped real hardware layout. Left empty (default) means
+    // identity mapping -- i.e. current behavior for robots without this mismatch (G1, Go2).
+    std::vector<int> joint_ids_map;
+
     void load_from_yaml(const std::string &filename)
     {
         auto cfg = YAML::LoadFile(filename);
@@ -41,6 +48,9 @@ inline struct SimulationConfig
             joystick_bits = cfg["joystick_bits"].as<int>();
             print_scene_information = cfg["print_scene_information"].as<int>();
             enable_elastic_band = cfg["enable_elastic_band"].as<int>();
+            if (cfg["joint_ids_map"]) {
+                joint_ids_map = cfg["joint_ids_map"].as<std::vector<int>>();
+            }
         }
         catch(const std::exception& e)
         {
