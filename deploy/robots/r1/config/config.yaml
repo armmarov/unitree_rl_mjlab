@@ -27,24 +27,31 @@ FSM:
       3,3,3,3,3,3,3,
     ]
   FixStand:
-    transitions: 
+    transitions:
       Passive: LT + B.on_pressed
       Velocity: RT + A.on_pressed
+    # kp/kd sourced from src/assets/robots/unitree_r1/r1_constants.py's stiffness/damping per
+    # actuator group (leg=100/2, ankle=40/2, waist=100/2, shoulder=40/2, wrist(yaw/elbow/roll)
+    # =20/1) -- a Unitree-authored asset, confirmed via r1-rl session 2026-09-08. Previous values
+    # here (knee 150/4, waist 200/5, wrist group 40/10) didn't match this and were a likely cause
+    # of failure to reach/hold the standing pose, especially combined with real (lower than
+    # previously assumed) torque limits: an overly stiff kp demanding more torque than the joint
+    # can actually produce saturates instead of converging.
     kp: [
-      100, 100, 100, 150, 40, 40,
-      100, 100, 100, 150, 40, 40,
-      200,200,200,
-      40,40,40,40,40,
-      100,100,
-      40,40,40,40,40,
+      100, 100, 100, 100, 40, 40,
+      100, 100, 100, 100, 40, 40,
+      100,100,100,
+      40,40,20,20,20,
+      20,20,
+      40,40,20,20,20,
     ]
     kd: [
-      2,2,2,4,2,2,
-      2,2,2,4,2,2,
-      5,5,5,
-      10,10,10,10,10,
-      4,4,
-      10,10,10,10,10,
+      2,2,2,2,2,2,
+      2,2,2,2,2,2,
+      2,2,2,
+      2,2,1,1,1,
+      1,1,
+      2,2,1,1,1,
     ]
     ts: [0, 3]
     qs: [
